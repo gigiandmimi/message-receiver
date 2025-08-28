@@ -77,6 +77,12 @@
                     class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center">
                     <i class="fa fa-paper-plane mr-2"></i>发送信息
                 </button>
+
+                <!-- 错误提示区域 -->
+                <div id="errorAlert" class="hidden text-red-500 text-sm p-3 bg-red-50 rounded-md">
+                    <i class="fa fa-exclamation-circle mr-1"></i>
+                    <span id="errorMessage"></span>
+                </div>
             </div>
         </div>
     </main>
@@ -88,42 +94,34 @@
     </footer>
 
     <script>
-        // Vercel API地址（和你的前端页面同域名，无需额外配置）
-        const API_URL = '/api/messages'; // 关键：直接使用相对路径，自动指向当前域名的API
-        
-        // DOM元素
+        const API_URL = '/api/messages';
         const messageDisplay = document.getElementById('messageDisplay');
         const newMessageInput = document.getElementById('newMessage');
         const sendButton = document.getElementById('sendButton');
         const messageCount = document.getElementById('messageCount');
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
         
-        // 页面加载时获取历史记录
         window.addEventListener('load', fetchMessages);
-        
-        // 定时刷新（每3秒获取一次新信息）
         setInterval(fetchMessages, 3000);
-        
-        // 发送按钮点击事件
         sendButton.addEventListener('click', sendMessage);
-        
-        // 按Enter键发送信息
-        newMessageInput.addEventListener('keypress', function(e) {
+        newMessageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
         
-        // 发送信息到Vercel API
+        // 发送信息（显示详细错误）
         async function sendMessage() {
             const messageContent = newMessageInput.value.trim();
-            
             if (!messageContent) {
-                alert('请输入信息内容');
+                showError('请输入信息内容');
                 return;
             }
             
             try {
+                hideError(); // 隐藏之前的错误
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -131,28 +129,31 @@
                 });
                 
                 const result = await response.json();
+                
+                if (!response.ok) {
+                    // 显示后端返回的具体错误（如权限问题、路径错误）
+                    throw new Error(result.error || '发送失败') + 
+                          (result.details ? '（' + result.details + '）' : '');
+                }
+                
                 if (result.status === 'success') {
-                    newMessageInput.value = ''; // 清空输入框
-                    fetchMessages(); // 立即刷新
-                } else {
-                    alert(result.error || '发送失败');
+                    newMessageInput.value = '';
+                    fetchMessages();
                 }
             } catch (error) {
                 console.error('发送失败:', error);
-                alert('发送失败，请重试');
+                showError(error.message); // 显示详细错误
             }
         }
         
-        // 从Vercel API获取所有信息
+        // 获取信息
         async function fetchMessages() {
             try {
                 const response = await fetch(API_URL);
+                if (!response.ok) throw new Error(`加载失败: ${response.status}`);
+                
                 const messages = await response.json();
-                
-                // 更新信息展示
                 updateMessageDisplay(messages);
-                
-                // 更新信息计数
                 messageCount.textContent = `(${messages.length} 条信息)`;
             } catch (error) {
                 console.error('获取信息失败:', error);
@@ -160,16 +161,26 @@
                     messageDisplay.innerHTML = `
                         <div class="text-red-500 text-center py-8">
                             <i class="fa fa-exclamation-triangle text-4xl mb-2"></i>
-                            <p>加载失败，请刷新页面</p>
+                            <p>${error.message}</p>
                         </div>
                     `;
                 }
             }
         }
         
-        // 更新信息展示区域
+        // 辅助函数：显示错误
+        function showError(text) {
+            errorMessage.textContent = text;
+            errorAlert.classList.remove('hidden');
+        }
+        
+        // 辅助函数：隐藏错误
+        function hideError() {
+            errorAlert.classList.add('hidden');
+        }
+        
         function updateMessageDisplay(messages) {
-            if (messages.length === 0) {
+            if (!messages || messages.length === 0) {
                 messageDisplay.innerHTML = `
                     <div class="text-gray-500 text-center py-8">
                         <i class="fa fa-comment-o text-4xl mb-2 opacity-30"></i>
@@ -179,7 +190,6 @@
                 return;
             }
             
-            // 生成信息HTML
             let messagesHtml = '';
             messages.forEach(msg => {
                 messagesHtml += `
@@ -195,7 +205,6 @@
             messageDisplay.innerHTML = messagesHtml;
         }
         
-        // 防止XSS攻击
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")
