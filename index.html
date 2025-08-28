@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>信息接收</title>
+    <title>信息展示</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script>
@@ -13,9 +13,7 @@
                     colors: {
                         primary: '#3b82f6',
                         secondary: '#f3f4f6',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        neutral: '#f9fafb'
                     },
                 }
             }
@@ -26,8 +24,18 @@
             .content-auto {
                 content-visibility: auto;
             }
-            .transition-smooth {
-                transition: all 0.3s ease-in-out;
+            .message-box {
+                @apply bg-white p-4 rounded-lg shadow-sm mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 4px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background-color: rgba(156, 163, 175, 0.5);
+                border-radius: 2px;
             }
         }
     </style>
@@ -35,95 +43,188 @@
 <body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- 顶部导航 -->
     <header class="bg-white shadow-sm py-4">
-        <div class="container mx-auto px-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-800 flex items-center">
-                <i class="fa fa-envelope-o text-primary mr-2"></i>
-                <span>信息接收器</span>
+        <div class="container mx-auto px-4">
+            <h1 class="text-2xl font-bold text-gray-800 text-center">
+                <i class="fa fa-comments text-primary mr-2"></i>信息展示
             </h1>
         </div>
     </header>
 
     <!-- 主要内容 -->
-    <main class="flex-grow container mx-auto px-4 py-8 md:py-16">
-        <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden transform transition-smooth hover:shadow-lg">
-            <div class="p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">发送信息</h2>
-                
-                <!-- 信息表单 -->
-                <form id="messageForm" class="space-y-4">
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
-                        <input type="text" id="name" name="name" required
-                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-smooth"
-                            placeholder="请输入您的姓名">
-                    </div>
-                    
-                    <div>
-                        <label for="message" class="block text-sm font-medium text-gray-700 mb-1">信息内容</label>
-                        <textarea id="message" name="message" rows="4" required
-                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-smooth resize-none"
-                            placeholder="请输入您要发送的信息"></textarea>
-                    </div>
-                    
-                    <button type="submit" 
-                        class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-md transition-smooth flex items-center justify-center">
-                        <i class="fa fa-paper-plane mr-2"></i>
-                        发送信息
-                    </button>
-                </form>
+    <main class="flex-grow container mx-auto px-4 py-6 md:py-8">
+        <!-- 信息展示区域（大面积） -->
+        <div class="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 h-[60vh] flex flex-col">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fa fa-list-alt text-primary mr-2"></i>公共信息区
+            </h2>
+            <div id="messageDisplay" class="flex-grow overflow-y-auto scrollbar-thin p-2 bg-neutral rounded">
+                <!-- 信息将通过JavaScript动态添加到这里 -->
+                <div class="text-gray-500 text-center py-8">
+                    <i class="fa fa-comment-o text-4xl mb-2 opacity-30"></i>
+                    <p>暂无信息，发送第一条信息吧！</p>
+                </div>
             </div>
         </div>
-        
-        <!-- 成功提示框 (默认隐藏) -->
-        <div id="successMessage" class="max-w-md mx-auto mt-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md shadow-sm hidden transform transition-smooth">
-            <div class="flex items-center">
-                <i class="fa fa-check-circle text-green-500 mr-3 text-xl"></i>
+
+        <!-- 发送信息区域 -->
+        <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fa fa-pencil text-primary mr-2"></i>发送信息
+            </h2>
+            <div class="space-y-4">
                 <div>
-                    <p class="font-medium">信息已成功接收！</p>
-                    <p class="text-sm mt-1" id="receivedInfo"></p>
+                    <label for="newMessage" class="block text-sm font-medium text-gray-700 mb-1">信息内容</label>
+                    <textarea id="newMessage" rows="3" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
+                        placeholder="请输入要发送的信息..."></textarea>
                 </div>
+                
+                <button id="sendButton" 
+                    class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center">
+                    <i class="fa fa-paper-plane mr-2"></i>发送信息
+                </button>
             </div>
         </div>
     </main>
 
     <!-- 页脚 -->
-    <footer class="bg-gray-800 text-white py-6">
+    <footer class="bg-gray-800 text-white py-4 mt-6">
         <div class="container mx-auto px-4 text-center text-sm">
-            <p>极简信息接收器 &copy; 2023</p>
+            <p>信息展示系统 &copy; 2023</p>
         </div>
     </footer>
 
     <script>
-        // 获取DOM元素
-        const messageForm = document.getElementById('messageForm');
-        const successMessage = document.getElementById('successMessage');
-        const receivedInfo = document.getElementById('receivedInfo');
-
-        // 表单提交事件处理
-        messageForm.addEventListener('submit', function(e) {
-            e.preventDefault(); // 阻止表单默认提交行为
-            
-            // 获取表单数据
-            const formData = new FormData(this);
-            const name = formData.get('name');
-            const message = formData.get('message');
-            
-            // 模拟信息接收处理
-            setTimeout(() => {
-                // 显示成功消息
-                receivedInfo.textContent = `感谢您的信息，${name}！我们会尽快处理。`;
-                successMessage.classList.remove('hidden');
-                successMessage.classList.add('animate-fade-in');
-                
-                // 重置表单
-                messageForm.reset();
-                
-                // 5秒后隐藏成功消息
-                setTimeout(() => {
-                    successMessage.classList.add('hidden');
-                }, 5000);
-            }, 800); // 模拟网络延迟
+        // 替换为你的内网穿透地址或Python服务器地址
+        const PYTHON_SERVER_URL = 'http://你的花生壳域名或服务器地址:8000/receive';
+        
+        // DOM元素
+        const messageDisplay = document.getElementById('messageDisplay');
+        const newMessageInput = document.getElementById('newMessage');
+        const sendButton = document.getElementById('sendButton');
+        
+        // 初始化：从本地存储加载历史信息
+        loadMessagesFromStorage();
+        
+        // 发送按钮点击事件
+        sendButton.addEventListener('click', sendMessage);
+        
+        // 按Enter键发送信息（文本框聚焦时）
+        newMessageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
         });
+        
+        // 发送信息函数
+        function sendMessage() {
+            const messageContent = newMessageInput.value.trim();
+            
+            if (!messageContent) {
+                alert('请输入信息内容');
+                return;
+            }
+            
+            const message = {
+                message: messageContent,
+                time: new Date().toLocaleString()
+            };
+            
+            // 添加到显示区域
+            addMessageToDisplay(message);
+            
+            // 保存到本地存储
+            saveMessageToStorage(message);
+            
+            // 发送到服务器（电脑端Python程序）
+            sendToServer(message);
+            
+            // 清空输入框
+            newMessageInput.value = '';
+        }
+        
+        // 添加信息到展示区域
+        function addMessageToDisplay(message) {
+            // 移除"暂无信息"提示
+            const emptyHint = messageDisplay.querySelector('.text-gray-500');
+            if (emptyHint) {
+                messageDisplay.removeChild(emptyHint);
+            }
+            
+            // 创建信息元素
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message-box';
+            messageElement.innerHTML = `
+                <div class="flex justify-end items-start mb-1">
+                    <span class="text-xs text-gray-500">${message.time}</span>
+                </div>
+                <p class="text-gray-700">${escapeHtml(message.message)}</p>
+            `;
+            
+            // 添加到展示区域顶部
+            messageDisplay.prepend(messageElement);
+            
+            // 滚动到最新信息
+            messageElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+        
+        // 保存信息到本地存储
+        function saveMessageToStorage(message) {
+            let messages = JSON.parse(localStorage.getItem('messages') || '[]');
+            messages.unshift(message); // 添加到数组开头
+            
+            // 限制最多保存100条信息
+            if (messages.length > 100) {
+                messages = messages.slice(0, 100);
+            }
+            
+            localStorage.setItem('messages', JSON.stringify(messages));
+        }
+        
+        // 从本地存储加载信息
+        function loadMessagesFromStorage() {
+            const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+            
+            if (messages.length > 0) {
+                // 清空"暂无信息"提示
+                const emptyHint = messageDisplay.querySelector('.text-gray-500');
+                if (emptyHint) {
+                    messageDisplay.removeChild(emptyHint);
+                }
+                
+                // 加载所有信息
+                messages.forEach(message => {
+                    addMessageToDisplay(message);
+                });
+            }
+        }
+        
+        // 发送信息到服务器
+        function sendToServer(message) {
+            fetch(PYTHON_SERVER_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(message)
+            })
+            .catch(error => {
+                console.error('发送到服务器失败:', error);
+                // 即使发送到服务器失败，信息也会显示在本地
+            });
+        }
+        
+        // 防止XSS攻击，转义HTML特殊字符
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
     </script>
 </body>
 </html>
+    
