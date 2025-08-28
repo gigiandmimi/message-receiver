@@ -1,7 +1,16 @@
-// 用于存储和读取消息的API接口
-// 部署在Vercel上，路径为 /api/messages
+// 无需KV存储，使用文件存储消息
+// 路径：api/messages.js
 
-import { kv } from '@vercel/kv'; // Vercel提供的免费KV存储服务
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
+// 定义存储消息的文件路径
+const MESSAGES_FILE = join(process.cwd(), 'messages.json');
+
+// 确保消息文件存在
+if (!existsSync(MESSAGES_FILE)) {
+  writeFileSync(MESSAGES_FILE, JSON.stringify([]), 'utf8');
+}
 
 export default async function handler(req, res) {
   // 允许跨域请求
@@ -10,45 +19,52 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // 处理OPTIONS预检请求
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
-    // 1. 读取所有消息（GET请求）
+    // 读取现有消息
+    const readMessages = () => {
+      const data = readFileSync(MESSAGES_FILE, 'utf8');
+      return JSON.parse(data) || [];
+    };
+
+    // 1. 获取所有消息（GET请求）
     if (req.method === 'GET') {
-      // 从KV存储中获取所有消息（按时间倒序）
-      const messages = await kv.lrange('messages', 0, -1) || [];
-      // 转换为对象格式返回
-      const parsedMessages = messages.map(msg => JSON.parse(msg));
-      return res.status(200).json(parsedMessages);
+      const messages = readMessages();
+      return res.status(200).json(messages);
     }
 
-    // 2. 存储新消息（POST请求）
+    // 2. 保存新消息（POST请求）
     if (req.method === 'POST') {
       const { message } = req.body;
       
       if (!message || message.trim() === '') {
         return res.status(400).json({ error: '信息内容不能为空' });
       }
-      
-      // 创建消息对象（包含时间戳）
+
+      // 创建新消息
       const newMessage = {
         message: message.trim(),
-        time: new Date().toLocaleString() // 格式：2023/10/1 12:30:45
+        time: new Date().toLocaleString()
       };
-      
-      // 存储到KV（添加到列表头部，确保最新的在前面）
-      await kv.lpush('messages', JSON.stringify(newMessage));
-      
-      // 限制最多存储1000条消息（防止存储过多）
-      await kv.ltrim('messages', 0, 999);
-      
+
+      // 读取现有消息并添加新消息
+      const messages = readMessages();
+      messages.unshift(newMessage); // 最新的消息放在前面
+
+      // 限制最多存储1000条消息
+      if (messages.length > 1000) {
+        messages.pop(); // 移除最旧的消息
+      }
+
+      // 写入文件
+      writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2), 'utf8');
+
       return res.status(200).json({ status: 'success' });
     }
 
-    // 其他请求方法
     return res.status(405).json({ error: '不支持的请求方法' });
   } catch (error) {
     console.error('API错误:', error);
