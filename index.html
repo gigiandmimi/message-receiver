@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>信息接收</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#f3f4f6',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-smooth {
+                transition: all 0.3s ease-in-out;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="fa fa-envelope-o text-primary mr-2"></i>
+                <span>信息接收器</span>
+            </h1>
+        </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="flex-grow container mx-auto px-4 py-8 md:py-16">
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden transform transition-smooth hover:shadow-lg">
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">发送信息</h2>
+                
+                <!-- 信息表单 -->
+                <form id="messageForm" class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                        <input type="text" id="name" name="name" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-smooth"
+                            placeholder="请输入您的姓名">
+                    </div>
+                    
+                    <div>
+                        <label for="message" class="block text-sm font-medium text-gray-700 mb-1">信息内容</label>
+                        <textarea id="message" name="message" rows="4" required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-smooth resize-none"
+                            placeholder="请输入您要发送的信息"></textarea>
+                    </div>
+                    
+                    <button type="submit" 
+                        class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-md transition-smooth flex items-center justify-center">
+                        <i class="fa fa-paper-plane mr-2"></i>
+                        发送信息
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 成功提示框 (默认隐藏) -->
+        <div id="successMessage" class="max-w-md mx-auto mt-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md shadow-sm hidden transform transition-smooth">
+            <div class="flex items-center">
+                <i class="fa fa-check-circle text-green-500 mr-3 text-xl"></i>
+                <div>
+                    <p class="font-medium">信息已成功接收！</p>
+                    <p class="text-sm mt-1" id="receivedInfo"></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-800 text-white py-6">
+        <div class="container mx-auto px-4 text-center text-sm">
+            <p>极简信息接收器 &copy; 2023</p>
+        </div>
+    </footer>
+
+    <script>
+        // 获取DOM元素
+        const messageForm = document.getElementById('messageForm');
+        const successMessage = document.getElementById('successMessage');
+        const receivedInfo = document.getElementById('receivedInfo');
+
+        // 表单提交事件处理
+        messageForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // 阻止表单默认提交行为
+            
+            // 获取表单数据
+            const formData = new FormData(this);
+            const name = formData.get('name');
+            const message = formData.get('message');
+            
+            // 模拟信息接收处理
+            setTimeout(() => {
+                // 显示成功消息
+                receivedInfo.textContent = `感谢您的信息，${name}！我们会尽快处理。`;
+                successMessage.classList.remove('hidden');
+                successMessage.classList.add('animate-fade-in');
+                
+                // 重置表单
+                messageForm.reset();
+                
+                // 5秒后隐藏成功消息
+                setTimeout(() => {
+                    successMessage.classList.add('hidden');
+                }, 5000);
+            }, 800); // 模拟网络延迟
+        });
+    </script>
+</body>
+</html>
