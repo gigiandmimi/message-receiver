@@ -12,7 +12,6 @@
                 extend: {
                     colors: {
                         primary: '#3b82f6',
-                        secondary: '#f3f4f6',
                         neutral: '#f9fafb'
                     },
                 }
@@ -21,9 +20,6 @@
     </script>
     <style type="text/tailwindcss">
         @layer utilities {
-            .content-auto {
-                content-visibility: auto;
-            }
             .message-box {
                 @apply bg-white p-4 rounded-lg shadow-sm mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
             }
@@ -41,7 +37,6 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
-    <!-- 顶部导航 -->
     <header class="bg-white shadow-sm py-4">
         <div class="container mx-auto px-4">
             <h1 class="text-2xl font-bold text-gray-800 text-center">
@@ -50,18 +45,17 @@
         </div>
     </header>
 
-    <!-- 主要内容 -->
     <main class="flex-grow container mx-auto px-4 py-6 md:py-8">
-        <!-- 信息展示区域（大面积） -->
+        <!-- 信息展示区域 -->
         <div class="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 h-[60vh] flex flex-col">
             <h2 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
                 <i class="fa fa-list-alt text-primary mr-2"></i>公共信息区
+                <span id="messageCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
             </h2>
             <div id="messageDisplay" class="flex-grow overflow-y-auto scrollbar-thin p-2 bg-neutral rounded">
-                <!-- 信息将通过JavaScript动态添加到这里 -->
                 <div class="text-gray-500 text-center py-8">
-                    <i class="fa fa-comment-o text-4xl mb-2 opacity-30"></i>
-                    <p>暂无信息，发送第一条信息吧！</p>
+                    <i class="fa fa-circle-o-notch fa-spin text-4xl mb-2 opacity-30"></i>
+                    <p>正在加载历史信息...</p>
                 </div>
             </div>
         </div>
@@ -87,29 +81,32 @@
         </div>
     </main>
 
-    <!-- 页脚 -->
     <footer class="bg-gray-800 text-white py-4 mt-6">
         <div class="container mx-auto px-4 text-center text-sm">
-            <p>信息展示系统 &copy; 2023</p>
+            <p>公共信息展示系统 &copy; 2023</p>
         </div>
     </footer>
 
     <script>
-        // 替换为你的内网穿透地址或Python服务器地址
-        const PYTHON_SERVER_URL = 'http://你的花生壳域名或服务器地址:8000/receive';
+        // Vercel API地址（和你的前端页面同域名，无需额外配置）
+        const API_URL = '/api/messages'; // 关键：直接使用相对路径，自动指向当前域名的API
         
         // DOM元素
         const messageDisplay = document.getElementById('messageDisplay');
         const newMessageInput = document.getElementById('newMessage');
         const sendButton = document.getElementById('sendButton');
+        const messageCount = document.getElementById('messageCount');
         
-        // 初始化：从本地存储加载历史信息
-        loadMessagesFromStorage();
+        // 页面加载时获取历史记录
+        window.addEventListener('load', fetchMessages);
+        
+        // 定时刷新（每3秒获取一次新信息）
+        setInterval(fetchMessages, 3000);
         
         // 发送按钮点击事件
         sendButton.addEventListener('click', sendMessage);
         
-        // 按Enter键发送信息（文本框聚焦时）
+        // 按Enter键发送信息
         newMessageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -117,8 +114,8 @@
             }
         });
         
-        // 发送信息函数
-        function sendMessage() {
+        // 发送信息到Vercel API
+        async function sendMessage() {
             const messageContent = newMessageInput.value.trim();
             
             if (!messageContent) {
@@ -126,96 +123,79 @@
                 return;
             }
             
-            const message = {
-                message: messageContent,
-                time: new Date().toLocaleString()
-            };
-            
-            // 添加到显示区域
-            addMessageToDisplay(message);
-            
-            // 保存到本地存储
-            saveMessageToStorage(message);
-            
-            // 发送到服务器（电脑端Python程序）
-            sendToServer(message);
-            
-            // 清空输入框
-            newMessageInput.value = '';
-        }
-        
-        // 添加信息到展示区域
-        function addMessageToDisplay(message) {
-            // 移除"暂无信息"提示
-            const emptyHint = messageDisplay.querySelector('.text-gray-500');
-            if (emptyHint) {
-                messageDisplay.removeChild(emptyHint);
-            }
-            
-            // 创建信息元素
-            const messageElement = document.createElement('div');
-            messageElement.className = 'message-box';
-            messageElement.innerHTML = `
-                <div class="flex justify-end items-start mb-1">
-                    <span class="text-xs text-gray-500">${message.time}</span>
-                </div>
-                <p class="text-gray-700">${escapeHtml(message.message)}</p>
-            `;
-            
-            // 添加到展示区域顶部
-            messageDisplay.prepend(messageElement);
-            
-            // 滚动到最新信息
-            messageElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
-        
-        // 保存信息到本地存储
-        function saveMessageToStorage(message) {
-            let messages = JSON.parse(localStorage.getItem('messages') || '[]');
-            messages.unshift(message); // 添加到数组开头
-            
-            // 限制最多保存100条信息
-            if (messages.length > 100) {
-                messages = messages.slice(0, 100);
-            }
-            
-            localStorage.setItem('messages', JSON.stringify(messages));
-        }
-        
-        // 从本地存储加载信息
-        function loadMessagesFromStorage() {
-            const messages = JSON.parse(localStorage.getItem('messages') || '[]');
-            
-            if (messages.length > 0) {
-                // 清空"暂无信息"提示
-                const emptyHint = messageDisplay.querySelector('.text-gray-500');
-                if (emptyHint) {
-                    messageDisplay.removeChild(emptyHint);
-                }
-                
-                // 加载所有信息
-                messages.forEach(message => {
-                    addMessageToDisplay(message);
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: messageContent })
                 });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    newMessageInput.value = ''; // 清空输入框
+                    fetchMessages(); // 立即刷新
+                } else {
+                    alert(result.error || '发送失败');
+                }
+            } catch (error) {
+                console.error('发送失败:', error);
+                alert('发送失败，请重试');
             }
         }
         
-        // 发送信息到服务器
-        function sendToServer(message) {
-            fetch(PYTHON_SERVER_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(message)
-            })
-            .catch(error => {
-                console.error('发送到服务器失败:', error);
-                // 即使发送到服务器失败，信息也会显示在本地
-            });
+        // 从Vercel API获取所有信息
+        async function fetchMessages() {
+            try {
+                const response = await fetch(API_URL);
+                const messages = await response.json();
+                
+                // 更新信息展示
+                updateMessageDisplay(messages);
+                
+                // 更新信息计数
+                messageCount.textContent = `(${messages.length} 条信息)`;
+            } catch (error) {
+                console.error('获取信息失败:', error);
+                if (messageDisplay.querySelector('.fa-spin')) {
+                    messageDisplay.innerHTML = `
+                        <div class="text-red-500 text-center py-8">
+                            <i class="fa fa-exclamation-triangle text-4xl mb-2"></i>
+                            <p>加载失败，请刷新页面</p>
+                        </div>
+                    `;
+                }
+            }
         }
         
-        // 防止XSS攻击，转义HTML特殊字符
+        // 更新信息展示区域
+        function updateMessageDisplay(messages) {
+            if (messages.length === 0) {
+                messageDisplay.innerHTML = `
+                    <div class="text-gray-500 text-center py-8">
+                        <i class="fa fa-comment-o text-4xl mb-2 opacity-30"></i>
+                        <p>暂无信息，发送第一条信息吧！</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 生成信息HTML
+            let messagesHtml = '';
+            messages.forEach(msg => {
+                messagesHtml += `
+                    <div class="message-box">
+                        <div class="flex justify-end items-start mb-1">
+                            <span class="text-xs text-gray-500">${msg.time}</span>
+                        </div>
+                        <p class="text-gray-700">${escapeHtml(msg.message)}</p>
+                    </div>
+                `;
+            });
+            
+            messageDisplay.innerHTML = messagesHtml;
+        }
+        
+        // 防止XSS攻击
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")
