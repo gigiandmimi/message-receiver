@@ -22,9 +22,6 @@
             .note-card {
                 @apply bg-white rounded-lg shadow-sm p-4 mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
             }
-            .note-card.new {
-                @apply bg-blue-50 animate-fadeIn;
-            }
             .scrollbar-thin {
                 scrollbar-width: thin;
             }
@@ -34,13 +31,6 @@
             .scrollbar-thin::-webkit-scrollbar-thumb {
                 background-color: rgba(79, 70, 229, 0.3);
                 border-radius: 3px;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fadeIn {
-                animation: fadeIn 0.5s ease-out;
             }
         }
     </style>
@@ -60,9 +50,6 @@
                 <h2 class="text-xl font-semibold text-gray-700 flex items-center">
                     <i class="fa fa-list-alt text-primary mr-2"></i>留言列表
                     <span id="noteCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
-                    <span id="newNoteIndicator" class="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded hidden">
-                        有新留言
-                    </span>
                 </h2>
                 <button id="refreshBtn" class="text-primary hover:text-primary/80 text-sm flex items-center">
                     <i class="fa fa-refresh mr-1"></i> 刷新
@@ -119,13 +106,11 @@
     </div>
 
     <script>
-        // API路径，确保与后端文件名一致
+        // 确保API路径与后端文件名一致
         const API_URL = '/api/messages';
         
-        // 存储最后一条留言的ID，用于检测新留言
-        let lastNoteId = null;
-        // 标记是否是首次加载
-        let isFirstLoad = true;
+        // 存储已显示的留言ID，防止重复
+        let displayedNoteIds = new Set();
         
         // DOM元素
         const noteForm = document.getElementById('noteForm');
@@ -139,19 +124,15 @@
         const errorDetails = document.getElementById('errorDetails');
         const noteCount = document.getElementById('noteCount');
         const refreshBtn = document.getElementById('refreshBtn');
-        const newNoteIndicator = document.getElementById('newNoteIndicator');
         
         // 页面加载时获取留言
         document.addEventListener('DOMContentLoaded', loadNotes);
         
         // 定时刷新（每10秒）
-        setInterval(checkForNewNotes, 10000);
+        setInterval(loadNotes, 10000);
         
         // 手动刷新
-        refreshBtn.addEventListener('click', function() {
-            newNoteIndicator.classList.add('hidden');
-            loadNotes();
-        });
+        refreshBtn.addEventListener('click', loadNotes);
         
         // 表单提交
         noteForm.addEventListener('submit', async function(e) {
@@ -159,10 +140,12 @@
             await submitNote();
         });
         
-        // 加载留言（完整加载）
+        // 加载留言 - 核心修改：避免重复显示
         async function loadNotes() {
-            // 显示加载状态
-            showState('loading');
+            // 显示加载状态（仅首次加载或手动刷新时）
+            if (displayedNoteIds.size === 0 || event && event.type === 'click') {
+                showState('loading');
+            }
             
             try {
                 const response = await fetch(API_URL);
@@ -175,51 +158,64 @@
                 
                 // 处理空数据
                 if (!result || result.length === 0) {
-                    lastNoteId = null;
-                    showState('empty');
-                    noteCount.textContent = '(0 条留言)';
-                    isFirstLoad = false;
+                    if (displayedNoteIds.size === 0) { // 只有首次加载且无数据时显示空状态
+                        showState('empty');
+                        noteCount.textContent = '(0 条留言)';
+                    }
                     return;
                 }
                 
-                // 更新最后一条留言ID
-                lastNoteId = result[0].id;
+                // 计算新留言数量
+                let newNoteCount = 0;
                 
-                // 渲染所有留言
-                renderNotes(result, true);
-                noteCount.textContent = `(${result.length} 条留言)`;
-                showState('content');
-                isFirstLoad = false;
+                // 遍历留言，只添加未显示过的
+                result.forEach(note => {
+                    if (!displayedNoteIds.has(note.id)) {
+                        displayedNoteIds.add(note.id);
+                        const noteElement = createNoteElement(note);
+                        // 新留言添加到最前面
+                        notesContainer.insertBefore(noteElement, notesContainer.firstChild);
+                        newNoteCount++;
+                    }
+                });
+                
+                // 更新计数
+                noteCount.textContent = `(${displayedNoteIds.size} 条留言)`;
+                
+                // 首次加载完成后显示内容
+                if (displayedNoteIds.size > 0 && result.length === displayedNoteIds.size) {
+                    showState('content');
+                }
                 
             } catch (error) {
                 console.error('加载失败:', error);
-                errorMessage.textContent = error.message;
-                errorDetails.textContent = error.details || '请检查API配置或Vercel KV是否启用';
-                showState('error');
+                // 只有首次加载失败才显示错误状态
+                if (displayedNoteIds.size === 0) {
+                    errorMessage.textContent = error.message;
+                    errorDetails.textContent = error.details || '请检查API配置或Vercel KV是否启用';
+                    showState('error');
+                }
             }
         }
         
-        // 检查新留言（增量更新）
-        async function checkForNewNotes() {
-            // 首次加载不进行增量检查
-            if (isFirstLoad) return;
+        // 创建单个留言元素
+        function createNoteElement(note) {
+            const noteElement = document.createElement('div');
+            noteElement.className = 'note-card';
             
-            try {
-                const response = await fetch(API_URL);
-                const result = await response.json();
-                
-                if (!response.ok || !result || result.length === 0) {
-                    return;
-                }
-                
-                // 有新留言时显示提示
-                if (lastNoteId && result[0].id !== lastNoteId) {
-                    newNoteIndicator.classList.remove('hidden');
-                }
-                
-            } catch (error) {
-                console.error('检查新留言失败:', error);
-            }
+            // 格式化时间
+            const date = new Date(note.timestamp);
+            const formattedTime = date.toLocaleString();
+            
+            noteElement.innerHTML = `
+                <div class="flex justify-between items-start mb-1">
+                    <span class="font-medium text-primary">${escapeHtml(note.author)}</span>
+                    <span class="text-xs text-gray-500">${formattedTime}</span>
+                </div>
+                <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(note.content)}</p>
+            `;
+            
+            return noteElement;
         }
         
         // 提交新留言
@@ -252,49 +248,6 @@
                 
             } catch (error) {
                 alert('发布失败: ' + error.message);
-            }
-        }
-        
-        // 渲染留言列表
-        function renderNotes(notes, isFullRender = false) {
-            // 完全渲染时清空容器
-            if (isFullRender) {
-                notesContainer.innerHTML = '';
-            }
-            
-            notes.forEach(note => {
-                // 如果不是完全渲染，只添加新的留言
-                if (!isFullRender && note.id === lastNoteId) {
-                    return; // 遇到已有的最后一条留言就停止
-                }
-                
-                const noteElement = document.createElement('div');
-                // 新留言添加特殊样式
-                noteElement.className = `note-card ${!isFullRender ? 'new' : ''}`;
-                
-                // 格式化时间
-                const date = new Date(note.timestamp);
-                const formattedTime = date.toLocaleString();
-                
-                noteElement.innerHTML = `
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="font-medium text-primary">${escapeHtml(note.author)}</span>
-                        <span class="text-xs text-gray-500">${formattedTime}</span>
-                    </div>
-                    <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(note.content)}</p>
-                `;
-                
-                // 完全渲染时添加到容器，增量更新时添加到最前面
-                if (isFullRender) {
-                    notesContainer.appendChild(noteElement);
-                } else {
-                    notesContainer.insertBefore(noteElement, notesContainer.firstChild);
-                }
-            });
-            
-            // 如果是增量更新，更新最后一条留言ID
-            if (!isFullRender && notes.length > 0) {
-                lastNoteId = notes[0].id;
             }
         }
         
