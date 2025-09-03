@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>共享留言板</title>
+    <title>多条路留言板</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script>
@@ -11,9 +11,8 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#10b981',
-                        secondary: '#f0fdf4',
-                    },
+                        primary: '#4f46e5',
+                    }
                 }
             }
         }
@@ -23,6 +22,9 @@
             .note-card {
                 @apply bg-white rounded-lg shadow-sm p-4 mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
             }
+            .note-card.new {
+                @apply bg-blue-50 animate-fadeIn;
+            }
             .scrollbar-thin {
                 scrollbar-width: thin;
             }
@@ -30,59 +32,59 @@
                 width: 5px;
             }
             .scrollbar-thin::-webkit-scrollbar-thumb {
-                background-color: rgba(16, 185, 129, 0.3);
+                background-color: rgba(79, 70, 229, 0.3);
                 border-radius: 3px;
             }
-            .pulse-animation {
-                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
-            @keyframes pulse {
-                0%, 100% {
-                    opacity: 1;
-                }
-                50% {
-                    opacity: 0.5;
-                }
+            .animate-fadeIn {
+                animation: fadeIn 0.5s ease-out;
             }
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- 页面标题 -->
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                <i class="fa fa-sticky-note text-primary mr-3"></i>共享留言板
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fa fa-comments text-primary mr-2"></i>共享留言板
             </h1>
-            <p class="text-gray-500">所有访问者都能看到彼此的留言，快来参与吧！</p>
+            <p class="text-gray-500">所有访客都能看到彼此的留言</p>
         </header>
 
         <!-- 留言展示区 -->
         <section class="bg-white rounded-xl shadow-md p-5 mb-8">
-            <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
-                <i class="fa fa-comments-o text-primary mr-2"></i>留言列表
-                <span id="noteCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
-                <span id="syncStatus" class="ml-2 text-xs text-gray-500 hidden">
-                    <i class="fa fa-refresh fa-spin"></i> 同步中...
-                </span>
-            </h2>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+                    <i class="fa fa-list-alt text-primary mr-2"></i>留言列表
+                    <span id="noteCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
+                    <span id="newNoteIndicator" class="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded hidden">
+                        有新留言
+                    </span>
+                </h2>
+                <button id="refreshBtn" class="text-primary hover:text-primary/80 text-sm flex items-center">
+                    <i class="fa fa-refresh mr-1"></i> 刷新
+                </button>
+            </div>
             <div id="notesContainer" class="min-h-[300px] max-h-[500px] overflow-y-auto scrollbar-thin p-2">
                 <!-- 加载状态 -->
                 <div id="loadingState" class="text-center py-12 text-gray-400">
-                    <i class="fa fa-circle-o-notch fa-spin text-5xl mb-4 opacity-30"></i>
+                    <i class="fa fa-circle-o-notch fa-spin text-4xl mb-2"></i>
                     <p>正在加载留言...</p>
                 </div>
                 
-                <!-- 错误状态 (默认隐藏) -->
-                <div id="errorState" class="text-center py-12 text-red-400 hidden">
-                    <i class="fa fa-exclamation-triangle text-5xl mb-4"></i>
-                    <p>加载失败，请刷新页面重试</p>
-                    <p id="errorDetails" class="text-xs mt-2"></p>
+                <!-- 错误状态（默认隐藏） -->
+                <div id="errorState" class="hidden text-center py-12 text-red-500">
+                    <i class="fa fa-exclamation-triangle text-4xl mb-2"></i>
+                    <p id="errorMessage">加载失败，请稍后重试</p>
+                    <p class="text-xs mt-2 text-gray-500" id="errorDetails"></p>
                 </div>
                 
-                <!-- 空状态 (默认隐藏) -->
-                <div id="emptyState" class="text-center py-12 text-gray-400 hidden">
-                    <i class="fa fa-pencil-square-o text-5xl mb-4 opacity-30"></i>
+                <!-- 空状态（默认隐藏） -->
+                <div id="emptyState" class="hidden text-center py-12 text-gray-400">
+                    <i class="fa fa-pencil text-4xl mb-2 opacity-30"></i>
                     <p>还没有留言，快来写下第一条吧！</p>
                 </div>
             </div>
@@ -95,146 +97,146 @@
             </h2>
             <form id="noteForm" class="space-y-4">
                 <div>
-                    <label for="noteAuthor" class="block text-sm font-medium text-gray-700 mb-1">你的昵称</label>
-                    <input type="text" id="noteAuthor" required
+                    <label for="author" class="block text-sm font-medium text-gray-700 mb-1">你的昵称</label>
+                    <input type="text" id="author" required maxlength="20"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                         placeholder="请输入你的昵称">
                 </div>
                 
                 <div>
-                    <label for="noteContent" class="block text-sm font-medium text-gray-700 mb-1">留言内容</label>
-                    <textarea id="noteContent" rows="4" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
-                        placeholder="请输入你的留言内容..."></textarea>
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-1">留言内容</label>
+                    <textarea id="content" rows="4" required maxlength="500"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
+                        placeholder="请输入你的留言..."></textarea>
                 </div>
                 
-                <div class="flex space-x-3">
-                    <button type="submit" id="submitBtn"
-                        class="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                        <i class="fa fa-paper-plane mr-2"></i>发布留言
-                    </button>
-                    <button type="button" id="refreshBtn"
-                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                        <i class="fa fa-refresh mr-2"></i>刷新
-                    </button>
-                </div>
+                <button type="submit" 
+                    class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fa fa-paper-plane mr-2"></i>发布留言
+                </button>
             </form>
         </section>
-
-        <!-- 提示信息 -->
-        <div class="mt-6 text-center text-sm text-gray-500 p-3 bg-green-50 rounded-lg">
-            <i class="fa fa-info-circle text-primary mr-1"></i>
-            提示：所有留言将保存在服务器上，所有访问者都能看到
-        </div>
     </div>
 
-    <footer class="mt-12 bg-gray-800 text-white py-6">
-        <div class="container mx-auto px-4 text-center text-sm">
-            <p>共享留言板 &copy; 2023</p>
-        </div>
-    </footer>
-
     <script>
-        // API路径 - 相对路径，与Vercel部署的域名一致
-        const API_URL = '/api/guestbook';
+        // API路径，确保与后端文件名一致
+        const API_URL = '/api/messages';
+        
+        // 存储最后一条留言的ID，用于检测新留言
+        let lastNoteId = null;
+        // 标记是否是首次加载
+        let isFirstLoad = true;
         
         // DOM元素
         const noteForm = document.getElementById('noteForm');
-        const noteAuthor = document.getElementById('noteAuthor');
-        const noteContent = document.getElementById('noteContent');
+        const authorInput = document.getElementById('author');
+        const contentInput = document.getElementById('content');
         const notesContainer = document.getElementById('notesContainer');
-        const noteCount = document.getElementById('noteCount');
-        const submitBtn = document.getElementById('submitBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const syncStatus = document.getElementById('syncStatus');
         const loadingState = document.getElementById('loadingState');
-        const emptyState = document.getElementById('emptyState');
         const errorState = document.getElementById('errorState');
+        const emptyState = document.getElementById('emptyState');
+        const errorMessage = document.getElementById('errorMessage');
         const errorDetails = document.getElementById('errorDetails');
+        const noteCount = document.getElementById('noteCount');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const newNoteIndicator = document.getElementById('newNoteIndicator');
         
-        // 初始化
-        document.addEventListener('DOMContentLoaded', () => {
+        // 页面加载时获取留言
+        document.addEventListener('DOMContentLoaded', loadNotes);
+        
+        // 定时刷新（每10秒）
+        setInterval(checkForNewNotes, 10000);
+        
+        // 手动刷新
+        refreshBtn.addEventListener('click', function() {
+            newNoteIndicator.classList.add('hidden');
             loadNotes();
-            // 定时同步新留言 (每10秒)
-            setInterval(loadNotes, 10000);
         });
         
-        // 表单提交事件
+        // 表单提交
         noteForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            await addNewNote();
+            await submitNote();
         });
         
-        // 刷新按钮
-        refreshBtn.addEventListener('click', loadNotes);
-        
-        // 加载所有留言
+        // 加载留言（完整加载）
         async function loadNotes() {
-            showSyncStatus();
-            hideAllStates();
-            loadingState.classList.remove('hidden');
+            // 显示加载状态
+            showState('loading');
             
             try {
                 const response = await fetch(API_URL);
+                const result = await response.json();
                 
+                // 处理HTTP错误
                 if (!response.ok) {
-                    throw new Error(`服务器错误: ${response.status}`);
+                    throw new Error(result.error || `加载失败 (${response.status})`);
                 }
                 
-                const notes = await response.json();
-                
-                // 更新留言计数
-                noteCount.textContent = `(${notes.length} 条留言)`;
-                
-                // 清空容器
-                const noteCardsContainer = document.createElement('div');
-                
-                // 显示空状态或留言列表
-                if (notes.length === 0) {
-                    emptyState.classList.remove('hidden');
-                } else {
-                    // 创建并添加每条留言
-                    notes.forEach(note => {
-                        const noteElement = createNoteElement(note);
-                        noteCardsContainer.appendChild(noteElement);
-                    });
-                    notesContainer.appendChild(noteCardsContainer);
+                // 处理空数据
+                if (!result || result.length === 0) {
+                    lastNoteId = null;
+                    showState('empty');
+                    noteCount.textContent = '(0 条留言)';
+                    isFirstLoad = false;
+                    return;
                 }
+                
+                // 更新最后一条留言ID
+                lastNoteId = result[0].id;
+                
+                // 渲染所有留言
+                renderNotes(result, true);
+                noteCount.textContent = `(${result.length} 条留言)`;
+                showState('content');
+                isFirstLoad = false;
                 
             } catch (error) {
-                console.error('加载留言失败:', error);
-                errorDetails.textContent = error.message;
-                errorState.classList.remove('hidden');
-            } finally {
-                loadingState.classList.add('hidden');
-                hideSyncStatus();
+                console.error('加载失败:', error);
+                errorMessage.textContent = error.message;
+                errorDetails.textContent = error.details || '请检查API配置或Vercel KV是否启用';
+                showState('error');
             }
         }
         
-        // 添加新留言
-        async function addNewNote() {
-            const author = noteAuthor.value.trim();
-            const content = noteContent.value.trim();
+        // 检查新留言（增量更新）
+        async function checkForNewNotes() {
+            // 首次加载不进行增量检查
+            if (isFirstLoad) return;
+            
+            try {
+                const response = await fetch(API_URL);
+                const result = await response.json();
+                
+                if (!response.ok || !result || result.length === 0) {
+                    return;
+                }
+                
+                // 有新留言时显示提示
+                if (lastNoteId && result[0].id !== lastNoteId) {
+                    newNoteIndicator.classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('检查新留言失败:', error);
+            }
+        }
+        
+        // 提交新留言
+        async function submitNote() {
+            const author = authorInput.value.trim();
+            const content = contentInput.value.trim();
             
             if (!author || !content) {
                 alert('请填写昵称和留言内容');
                 return;
             }
             
-            // 显示加载状态
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-2"></i>发布中...';
-            
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        author: author,
-                        content: content
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ author, content })
                 });
                 
                 const result = await response.json();
@@ -243,62 +245,71 @@
                     throw new Error(result.error || '发布失败');
                 }
                 
-                // 发布成功，重新加载留言列表
-                noteAuthor.value = '';
-                noteContent.value = '';
-                await loadNotes();
-                
-                // 显示成功提示
-                alert('留言发布成功！');
+                // 发布成功后刷新列表并清空输入
+                authorInput.value = '';
+                contentInput.value = '';
+                loadNotes();
                 
             } catch (error) {
-                console.error('发布留言失败:', error);
-                alert(error.message);
-            } finally {
-                // 恢复按钮状态
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fa fa-paper-plane mr-2"></i>发布留言';
+                alert('发布失败: ' + error.message);
             }
         }
         
-        // 创建单个留言元素
-        function createNoteElement(note) {
-            const div = document.createElement('div');
-            div.className = 'note-card';
+        // 渲染留言列表
+        function renderNotes(notes, isFullRender = false) {
+            // 完全渲染时清空容器
+            if (isFullRender) {
+                notesContainer.innerHTML = '';
+            }
             
-            // 格式化日期显示
-            const date = new Date(note.timestamp);
-            const formattedDate = date.toLocaleString();
+            notes.forEach(note => {
+                // 如果不是完全渲染，只添加新的留言
+                if (!isFullRender && note.id === lastNoteId) {
+                    return; // 遇到已有的最后一条留言就停止
+                }
+                
+                const noteElement = document.createElement('div');
+                // 新留言添加特殊样式
+                noteElement.className = `note-card ${!isFullRender ? 'new' : ''}`;
+                
+                // 格式化时间
+                const date = new Date(note.timestamp);
+                const formattedTime = date.toLocaleString();
+                
+                noteElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="font-medium text-primary">${escapeHtml(note.author)}</span>
+                        <span class="text-xs text-gray-500">${formattedTime}</span>
+                    </div>
+                    <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(note.content)}</p>
+                `;
+                
+                // 完全渲染时添加到容器，增量更新时添加到最前面
+                if (isFullRender) {
+                    notesContainer.appendChild(noteElement);
+                } else {
+                    notesContainer.insertBefore(noteElement, notesContainer.firstChild);
+                }
+            });
             
-            div.innerHTML = `
-                <div class="flex justify-between items-start mb-1">
-                    <span class="font-medium text-gray-800">${escapeHtml(note.author)}</span>
-                    <span class="text-xs text-gray-500">${formattedDate}</span>
-                </div>
-                <p class="text-gray-700 whitespace-pre-wrap mt-2">${escapeHtml(note.content)}</p>
-            `;
-            
-            return div;
+            // 如果是增量更新，更新最后一条留言ID
+            if (!isFullRender && notes.length > 0) {
+                lastNoteId = notes[0].id;
+            }
         }
         
-        // 辅助函数：显示同步状态
-        function showSyncStatus() {
-            syncStatus.classList.remove('hidden');
-        }
-        
-        // 辅助函数：隐藏同步状态
-        function hideSyncStatus() {
-            syncStatus.classList.add('hidden');
-        }
-        
-        // 辅助函数：隐藏所有状态元素
-        function hideAllStates() {
+        // 显示不同状态（加载/错误/空/内容）
+        function showState(state) {
             loadingState.classList.add('hidden');
-            emptyState.classList.add('hidden');
             errorState.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            
+            if (state === 'loading') loadingState.classList.remove('hidden');
+            else if (state === 'error') errorState.classList.remove('hidden');
+            else if (state === 'empty') emptyState.classList.remove('hidden');
         }
         
-        // 防止XSS攻击，转义HTML特殊字符
+        // 防XSS攻击
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")
