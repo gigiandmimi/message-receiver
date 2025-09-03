@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>信息展示</title>
+    <title>共享留言板</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script>
@@ -11,8 +11,8 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#3b82f6',
-                        neutral: '#f9fafb'
+                        primary: '#10b981',
+                        secondary: '#f0fdf4',
                     },
                 }
             }
@@ -20,191 +20,285 @@
     </script>
     <style type="text/tailwindcss">
         @layer utilities {
-            .message-box {
-                @apply bg-white p-4 rounded-lg shadow-sm mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
+            .note-card {
+                @apply bg-white rounded-lg shadow-sm p-4 mb-4 border-l-4 border-primary transition-all duration-300 hover:shadow-md;
             }
             .scrollbar-thin {
                 scrollbar-width: thin;
             }
             .scrollbar-thin::-webkit-scrollbar {
-                width: 4px;
+                width: 5px;
             }
             .scrollbar-thin::-webkit-scrollbar-thumb {
-                background-color: rgba(156, 163, 175, 0.5);
-                border-radius: 2px;
+                background-color: rgba(16, 185, 129, 0.3);
+                border-radius: 3px;
+            }
+            .pulse-animation {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
             }
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
-    <header class="bg-white shadow-sm py-4">
-        <div class="container mx-auto px-4">
-            <h1 class="text-2xl font-bold text-gray-800 text-center">
-                <i class="fa fa-comments text-primary mr-2"></i>信息展示
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 页面标题 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+                <i class="fa fa-sticky-note text-primary mr-3"></i>共享留言板
             </h1>
-        </div>
-    </header>
+            <p class="text-gray-500">所有访问者都能看到彼此的留言，快来参与吧！</p>
+        </header>
 
-    <main class="flex-grow container mx-auto px-4 py-6 md:py-8">
-        <!-- 信息展示区域 -->
-        <div class="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 h-[60vh] flex flex-col">
-            <h2 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                <i class="fa fa-list-alt text-primary mr-2"></i>公共信息区
-                <span id="messageCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
+        <!-- 留言展示区 -->
+        <section class="bg-white rounded-xl shadow-md p-5 mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fa fa-comments-o text-primary mr-2"></i>留言列表
+                <span id="noteCount" class="ml-2 text-sm text-gray-500">(加载中...)</span>
+                <span id="syncStatus" class="ml-2 text-xs text-gray-500 hidden">
+                    <i class="fa fa-refresh fa-spin"></i> 同步中...
+                </span>
             </h2>
-            <div id="messageDisplay" class="flex-grow overflow-y-auto scrollbar-thin p-2 bg-neutral rounded">
-                <div class="text-gray-500 text-center py-8">
-                    <i class="fa fa-circle-o-notch fa-spin text-4xl mb-2 opacity-30"></i>
-                    <p>正在加载历史信息...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 发送信息区域 -->
-        <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
-            <h2 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                <i class="fa fa-pencil text-primary mr-2"></i>发送信息
-            </h2>
-            <div class="space-y-4">
-                <div>
-                    <label for="newMessage" class="block text-sm font-medium text-gray-700 mb-1">信息内容</label>
-                    <textarea id="newMessage" rows="3" required
-                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
-                        placeholder="请输入要发送的信息..."></textarea>
+            <div id="notesContainer" class="min-h-[300px] max-h-[500px] overflow-y-auto scrollbar-thin p-2">
+                <!-- 加载状态 -->
+                <div id="loadingState" class="text-center py-12 text-gray-400">
+                    <i class="fa fa-circle-o-notch fa-spin text-5xl mb-4 opacity-30"></i>
+                    <p>正在加载留言...</p>
                 </div>
                 
-                <button id="sendButton" 
-                    class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center">
-                    <i class="fa fa-paper-plane mr-2"></i>发送信息
-                </button>
-
-                <!-- 错误提示区域 -->
-                <div id="errorAlert" class="hidden text-red-500 text-sm p-3 bg-red-50 rounded-md">
-                    <i class="fa fa-exclamation-circle mr-1"></i>
-                    <span id="errorMessage"></span>
+                <!-- 错误状态 (默认隐藏) -->
+                <div id="errorState" class="text-center py-12 text-red-400 hidden">
+                    <i class="fa fa-exclamation-triangle text-5xl mb-4"></i>
+                    <p>加载失败，请刷新页面重试</p>
+                    <p id="errorDetails" class="text-xs mt-2"></p>
+                </div>
+                
+                <!-- 空状态 (默认隐藏) -->
+                <div id="emptyState" class="text-center py-12 text-gray-400 hidden">
+                    <i class="fa fa-pencil-square-o text-5xl mb-4 opacity-30"></i>
+                    <p>还没有留言，快来写下第一条吧！</p>
                 </div>
             </div>
-        </div>
-    </main>
+        </section>
 
-    <footer class="bg-gray-800 text-white py-4 mt-6">
+        <!-- 留言表单 -->
+        <section class="bg-white rounded-xl shadow-md p-5">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fa fa-pencil text-primary mr-2"></i>写下留言
+            </h2>
+            <form id="noteForm" class="space-y-4">
+                <div>
+                    <label for="noteAuthor" class="block text-sm font-medium text-gray-700 mb-1">你的昵称</label>
+                    <input type="text" id="noteAuthor" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                        placeholder="请输入你的昵称">
+                </div>
+                
+                <div>
+                    <label for="noteContent" class="block text-sm font-medium text-gray-700 mb-1">留言内容</label>
+                    <textarea id="noteContent" rows="4" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors resize-none"
+                        placeholder="请输入你的留言内容..."></textarea>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button type="submit" id="submitBtn"
+                        class="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="fa fa-paper-plane mr-2"></i>发布留言
+                    </button>
+                    <button type="button" id="refreshBtn"
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <i class="fa fa-refresh mr-2"></i>刷新
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- 提示信息 -->
+        <div class="mt-6 text-center text-sm text-gray-500 p-3 bg-green-50 rounded-lg">
+            <i class="fa fa-info-circle text-primary mr-1"></i>
+            提示：所有留言将保存在服务器上，所有访问者都能看到
+        </div>
+    </div>
+
+    <footer class="mt-12 bg-gray-800 text-white py-6">
         <div class="container mx-auto px-4 text-center text-sm">
-            <p>公共信息展示系统 &copy; 2023</p>
+            <p>共享留言板 &copy; 2023</p>
         </div>
     </footer>
 
     <script>
-        const API_URL = '/api/messages';
-        const messageDisplay = document.getElementById('messageDisplay');
-        const newMessageInput = document.getElementById('newMessage');
-        const sendButton = document.getElementById('sendButton');
-        const messageCount = document.getElementById('messageCount');
-        const errorAlert = document.getElementById('errorAlert');
-        const errorMessage = document.getElementById('errorMessage');
+        // API路径 - 相对路径，与Vercel部署的域名一致
+        const API_URL = '/api/guestbook';
         
-        window.addEventListener('load', fetchMessages);
-        setInterval(fetchMessages, 3000);
-        sendButton.addEventListener('click', sendMessage);
-        newMessageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+        // DOM元素
+        const noteForm = document.getElementById('noteForm');
+        const noteAuthor = document.getElementById('noteAuthor');
+        const noteContent = document.getElementById('noteContent');
+        const notesContainer = document.getElementById('notesContainer');
+        const noteCount = document.getElementById('noteCount');
+        const submitBtn = document.getElementById('submitBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const syncStatus = document.getElementById('syncStatus');
+        const loadingState = document.getElementById('loadingState');
+        const emptyState = document.getElementById('emptyState');
+        const errorState = document.getElementById('errorState');
+        const errorDetails = document.getElementById('errorDetails');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNotes();
+            // 定时同步新留言 (每10秒)
+            setInterval(loadNotes, 10000);
         });
         
-        // 发送信息（显示详细错误）
-        async function sendMessage() {
-            const messageContent = newMessageInput.value.trim();
-            if (!messageContent) {
-                showError('请输入信息内容');
+        // 表单提交事件
+        noteForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await addNewNote();
+        });
+        
+        // 刷新按钮
+        refreshBtn.addEventListener('click', loadNotes);
+        
+        // 加载所有留言
+        async function loadNotes() {
+            showSyncStatus();
+            hideAllStates();
+            loadingState.classList.remove('hidden');
+            
+            try {
+                const response = await fetch(API_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`服务器错误: ${response.status}`);
+                }
+                
+                const notes = await response.json();
+                
+                // 更新留言计数
+                noteCount.textContent = `(${notes.length} 条留言)`;
+                
+                // 清空容器
+                const noteCardsContainer = document.createElement('div');
+                
+                // 显示空状态或留言列表
+                if (notes.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    // 创建并添加每条留言
+                    notes.forEach(note => {
+                        const noteElement = createNoteElement(note);
+                        noteCardsContainer.appendChild(noteElement);
+                    });
+                    notesContainer.appendChild(noteCardsContainer);
+                }
+                
+            } catch (error) {
+                console.error('加载留言失败:', error);
+                errorDetails.textContent = error.message;
+                errorState.classList.remove('hidden');
+            } finally {
+                loadingState.classList.add('hidden');
+                hideSyncStatus();
+            }
+        }
+        
+        // 添加新留言
+        async function addNewNote() {
+            const author = noteAuthor.value.trim();
+            const content = noteContent.value.trim();
+            
+            if (!author || !content) {
+                alert('请填写昵称和留言内容');
                 return;
             }
             
+            // 显示加载状态
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-2"></i>发布中...';
+            
             try {
-                hideError(); // 隐藏之前的错误
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: messageContent })
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        author: author,
+                        content: content
+                    })
                 });
                 
                 const result = await response.json();
                 
                 if (!response.ok) {
-                    // 显示后端返回的具体错误（如权限问题、路径错误）
-                    throw new Error(result.error || '发送失败') + 
-                          (result.details ? '（' + result.details + '）' : '');
+                    throw new Error(result.error || '发布失败');
                 }
                 
-                if (result.status === 'success') {
-                    newMessageInput.value = '';
-                    fetchMessages();
-                }
-            } catch (error) {
-                console.error('发送失败:', error);
-                showError(error.message); // 显示详细错误
-            }
-        }
-        
-        // 获取信息
-        async function fetchMessages() {
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error(`加载失败: ${response.status}`);
+                // 发布成功，重新加载留言列表
+                noteAuthor.value = '';
+                noteContent.value = '';
+                await loadNotes();
                 
-                const messages = await response.json();
-                updateMessageDisplay(messages);
-                messageCount.textContent = `(${messages.length} 条信息)`;
+                // 显示成功提示
+                alert('留言发布成功！');
+                
             } catch (error) {
-                console.error('获取信息失败:', error);
-                if (messageDisplay.querySelector('.fa-spin')) {
-                    messageDisplay.innerHTML = `
-                        <div class="text-red-500 text-center py-8">
-                            <i class="fa fa-exclamation-triangle text-4xl mb-2"></i>
-                            <p>${error.message}</p>
-                        </div>
-                    `;
-                }
+                console.error('发布留言失败:', error);
+                alert(error.message);
+            } finally {
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa fa-paper-plane mr-2"></i>发布留言';
             }
         }
         
-        // 辅助函数：显示错误
-        function showError(text) {
-            errorMessage.textContent = text;
-            errorAlert.classList.remove('hidden');
-        }
-        
-        // 辅助函数：隐藏错误
-        function hideError() {
-            errorAlert.classList.add('hidden');
-        }
-        
-        function updateMessageDisplay(messages) {
-            if (!messages || messages.length === 0) {
-                messageDisplay.innerHTML = `
-                    <div class="text-gray-500 text-center py-8">
-                        <i class="fa fa-comment-o text-4xl mb-2 opacity-30"></i>
-                        <p>暂无信息，发送第一条信息吧！</p>
-                    </div>
-                `;
-                return;
-            }
+        // 创建单个留言元素
+        function createNoteElement(note) {
+            const div = document.createElement('div');
+            div.className = 'note-card';
             
-            let messagesHtml = '';
-            messages.forEach(msg => {
-                messagesHtml += `
-                    <div class="message-box">
-                        <div class="flex justify-end items-start mb-1">
-                            <span class="text-xs text-gray-500">${msg.time}</span>
-                        </div>
-                        <p class="text-gray-700">${escapeHtml(msg.message)}</p>
-                    </div>
-                `;
-            });
+            // 格式化日期显示
+            const date = new Date(note.timestamp);
+            const formattedDate = date.toLocaleString();
             
-            messageDisplay.innerHTML = messagesHtml;
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-1">
+                    <span class="font-medium text-gray-800">${escapeHtml(note.author)}</span>
+                    <span class="text-xs text-gray-500">${formattedDate}</span>
+                </div>
+                <p class="text-gray-700 whitespace-pre-wrap mt-2">${escapeHtml(note.content)}</p>
+            `;
+            
+            return div;
         }
         
+        // 辅助函数：显示同步状态
+        function showSyncStatus() {
+            syncStatus.classList.remove('hidden');
+        }
+        
+        // 辅助函数：隐藏同步状态
+        function hideSyncStatus() {
+            syncStatus.classList.add('hidden');
+        }
+        
+        // 辅助函数：隐藏所有状态元素
+        function hideAllStates() {
+            loadingState.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            errorState.classList.add('hidden');
+        }
+        
+        // 防止XSS攻击，转义HTML特殊字符
         function escapeHtml(unsafe) {
             return unsafe
                 .replace(/&/g, "&amp;")
