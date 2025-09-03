@@ -1,93 +1,86 @@
-// 修复服务器内部错误的后端API
-// 路径：api/messages.js
+<// 后端API：处理留言的存储和读取
+// 路径：api/guestbook.js
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
-
-// 关键修改：使用Vercel允许写入的临时目录/tmp
-// 注意：/tmp目录在函数冷启动时可能被清空，但对小型应用影响不大
-const MESSAGES_FILE = join('/tmp', 'messages.json');
-
-// 初始化文件（确保文件存在）
-try {
-  if (!existsSync(MESSAGES_FILE)) {
-    // 首次运行时创建文件
-    writeFileSync(MESSAGES_FILE, JSON.stringify([]), 'utf8');
-    console.log('在/tmp目录创建了messages.json');
-  }
-} catch (error) {
-  console.error('初始化文件失败:', error);
-}
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // 设置响应头，允许跨域和指定内容类型
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).json({ status: 'ok' });
-  }
+    // 处理预检请求
+    if (req.method === 'OPTIONS') {
+        return res.status(200).json({ status: 'ok' });
+    }
 
-  try {
-    // 读取消息
-    const readMessages = () => {
-      try {
-        if (!existsSync(MESSAGES_FILE)) {
-          // 如果文件不存在（冷启动后），返回空数组
-          return [];
+    try {
+        // 获取所有留言 (GET请求)
+        if (req.method === 'GET') {
+            // 从KV存储获取所有留言ID
+            const noteIds = await kv.zrange('guestbook:notes', 0, -1, {
+                rev: true // 按时间倒序排列（最新的在前）
+            });
+
+            // 获取每条留言的详细内容
+            const notes = [];
+            for (const id of noteIds) {
+                const note = await kv.get(`guestbook:note:${id}`);
+                if (note) {
+                    notes.push(note);
+                }
+            }
+
+            return res.status(200).json(notes);
         }
-        const data = readFileSync(MESSAGES_FILE, 'utf8');
-        return Array.isArray(JSON.parse(data)) ? JSON.parse(data) : [];
-      } catch (err) {
-        console.error('读取文件错误:', err);
-        throw new Error('读取消息失败：' + err.message);
-      }
-    };
 
-    // GET请求：返回消息
-    if (req.method === 'GET') {
-      const messages = readMessages();
-      return res.status(200).json(messages);
+        // 发布新留言 (POST请求)
+        if (req.method === 'POST') {
+            // 验证请求数据
+            if (!req.body || !req.body.author || !req.body.content) {
+                return res.status(400).json({ error: '请提供昵称和留言内容' });
+            }
+
+            // 清理和验证输入
+            const author = req.body.author.trim().substring(0, 20); // 限制昵称长度
+            const content = req.body.content.trim().substring(0, 500); // 限制内容长度
+
+            if (author.length === 0 || content.length === 0) {
+                return res.status(400).json({ error: '昵称和留言内容不能为空' });
+            }
+
+            // 创建留言对象
+            const noteId = Date.now().toString(); // 使用时间戳作为ID
+            const note = {
+                id: noteId,
+                author: author,
+                content: content,
+                timestamp: new Date().toISOString() // 存储ISO格式时间戳
+            };
+
+            // 存储留言：
+            // 1. 存储到有序集合，用于排序和获取列表
+            await kv.zadd('guestbook:notes', {
+                score: parseInt(noteId), // 使用时间戳作为分数，用于排序
+                member: noteId
+            });
+
+            // 2. 存储留言详细内容
+            await kv.set(`guestbook:note:${noteId}`, note);
+
+            // 3. 限制最多存储1000条留言
+            await kv.zremrangebyrank('guestbook:notes', 0, -1001);
+
+            return res.status(200).json({ status: 'success', noteId: noteId });
+        }
+
+        // 不支持的请求方法
+        return res.status(405).json({ error: '不支持的请求方法' });
+
+    } catch (error) {
+        console.error('API错误:', error);
+        return res.status(500).json({ error: '服务器内部错误', details: error.message });
     }
-
-    // POST请求：保存消息（重点修复部分）
-    if (req.method === 'POST') {
-      if (!req.body || typeof req.body.message !== 'string') {
-        return res.status(400).json({ error: '无效的信息格式' });
-      }
-
-      const messageContent = req.body.message.trim();
-      if (!messageContent) {
-        return res.status(400).json({ error: '信息内容不能为空' });
-      }
-
-      const newMessage = {
-        message: messageContent,
-        time: new Date().toLocaleString()
-      };
-
-      // 读取现有消息
-      const messages = readMessages();
-      messages.unshift(newMessage);
-      if (messages.length > 1000) messages.pop(); // 限制数量
-
-      // 写入临时目录（关键修改：这里之前可能因权限失败）
-      writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2), 'utf8');
-      console.log('消息写入成功，当前数量：', messages.length);
-
-      return res.status(200).json({ status: 'success' });
-    }
-
-    return res.status(405).json({ error: '不支持的请求方法' });
-
-  } catch (error) {
-    // 捕获所有错误并返回详细信息
-    console.error('API处理错误:', error);
-    return res.status(500).json({ 
-      error: '服务器内部错误', 
-      details: error.message,
-      file: MESSAGES_FILE // 输出文件路径帮助排查
-    });
-  }
 }
+    
